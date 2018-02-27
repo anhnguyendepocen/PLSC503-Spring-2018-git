@@ -1,12 +1,23 @@
 ################################################
-# PLSC 503 -- Spring 2017: Code for Day Twelve.
+# PLSC 503 -- Spring 2018: Code for Day Twelve.
 ################################################
 
 # ANES 2016 pilot study aggregation example...
 
+library(RCurl)
 library(plyr)
 library(car)
-library(RCurl)
+library(rms)
+library(plm)
+library(lmtest)
+
+# Handy "robust" summary function for lm:
+
+url_robust <- "https://raw.githubusercontent.com/IsidoreBeautrelet/economictheoryblog/master/robust_summary.R"
+eval(parse(text = getURL(url_robust, ssl.verifypeer = FALSE)),
+     envir=.GlobalEnv)
+rm(url_robust)
+
 temp<-getURL("https://raw.githubusercontent.com/PrisonRodeo/PLSC503-Spring-2018-git/master/Data/ANES-pilot-2016.csv")
 ANES<-read.csv(text=temp, header=TRUE)
 rm(temp)
@@ -22,9 +33,9 @@ summary(ANES$ftgay)
 ANES$State<-recode(ANES$state,
 "1='AL';2='AK';4='AZ';5='AR';6='CA';8='CO';9='CT';
 10='DE';11='DC';12='FL';13='GA';15='HI';16='ID';17='IL';
-18='IN';19='IA';20='KS';21='KY';22='LA';23='ME';24='MD';25='MA';
-26='MI';27='MN';28='MS';29='MO';30='MT';31='NE';32='NV';
-33='NH';34='NJ';35='NM';36='NY';37='NC';38='ND';
+18='IN';19='IA';20='KS';21='KY';22='LA';23='ME';24='MD';
+25='MA';26='MI';27='MN';28='MS';29='MO';30='MT';31='NE';
+32='NV';33='NH';34='NJ';35='NM';36='NY';37='NC';38='ND';
 39='OH';40='OK';41='OR';42='PA';44='RI';45='SC';46='SD';
 47='TN';48='TX';49='UT';50='VT';51='VA';53='WA';54='WV';
 55='WI';56='WY'")
@@ -51,7 +62,30 @@ abline(h=mean(StateFT$meantherm),lwd=2,lty=2,col="red")
 abline(respfit,lwd=3,col="darkgreen")
 dev.off()
 
-#Justices data:
+#########################################
+# What do "robust" SEs do? A simulation:
+
+set.seed(7222009)
+X <- rnorm(10)
+Y <- 1 + X + rnorm(10)
+df10 <- data.frame(ID=seq(1:10),X=X,Y=Y)
+
+fit10 <- lm(Y~X,data=df10)
+summary(fit10)
+rob10 <- vcovHC(fit10,type="HC1")
+sqrt(diag(rob10))
+
+# "Clone" each observation 100 times
+
+df1K <- df10[rep(seq_len(nrow(df10)), each=100),]
+df1K <- pdata.frame(df1K, index="ID")
+
+fit1K <- lm(Y~X,data=df1K)
+summary(fit1K)
+summary(fit1K, cluster="ID")
+
+###########################
+# Justices data:
 
 temp<-getURL("https://raw.githubusercontent.com/PrisonRodeo/PLSC503-Spring-2018-git/master/Data/Justices.csv")
 Justices<-read.csv(text=temp, header=TRUE)
@@ -79,10 +113,8 @@ dev.off()
 
 # "Robust"
 
-library(car)
 hccm(OLSfit, type="hc1")
 
-library(rms)
 OLSfit2<-ols(civrts~score, x=TRUE, y=TRUE)
 RobSEs<-robcov(OLSfit2)
 RobSEs
